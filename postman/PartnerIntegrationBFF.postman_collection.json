@@ -1,0 +1,73 @@
+{
+  "info": {
+    "name": "PartnerIntegrationBFF - Step 1",
+    "description": "POST /api/v1/partner/transactions - validation test cases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5109" }
+  ],
+  "item": [
+    {
+      "name": "1. Valid transaction -> 202 Accepted",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        }
+      }
+    },
+    {
+      "name": "2. Empty payload -> 400 (all fields required)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        }
+      }
+    },
+    {
+      "name": "3. Amount <= 0 -> 400",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": -5,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        }
+      }
+    },
+    {
+      "name": "4. Invalid currency code -> 400",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": 250,\n  \"currency\": \"XXX\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        }
+      }
+    }
+  ]
+}
