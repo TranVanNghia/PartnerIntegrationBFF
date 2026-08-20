@@ -15,6 +15,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddHttpContextAccessor();
+builder.Services
+    .AddOptions<PartnerVerificationApiOptions>()
+    .Bind(builder.Configuration.GetSection(PartnerVerificationApiOptions.SectionName))
+    .Validate(o => !string.IsNullOrWhiteSpace(o.RelativePath), $"{PartnerVerificationApiOptions.SectionName}:RelativePath is required.")
+    .ValidateOnStart();
 builder.Services.AddHttpClient<IPartnerVerificationClient, PartnerVerificationClient>()
     .AddStandardResilienceHandler(options =>
     {

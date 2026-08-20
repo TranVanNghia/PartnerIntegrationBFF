@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using PartnerIntegrationBFF.Api.Models;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
@@ -14,21 +15,24 @@ public class PartnerVerificationClient : IPartnerVerificationClient
 {
     private readonly HttpClient _httpClient;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly PartnerVerificationApiOptions _options;
     private readonly ILogger<PartnerVerificationClient> _logger;
 
     public PartnerVerificationClient(
         HttpClient httpClient,
         IHttpContextAccessor httpContextAccessor,
+        IOptions<PartnerVerificationApiOptions> options,
         ILogger<PartnerVerificationClient> logger)
     {
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
+        _options = options.Value;
         _logger = logger;
     }
 
     public async Task<bool> VerifyPartnerAsync(string partnerId, CancellationToken cancellationToken)
     {
-        var requestUri = new Uri(ResolveBaseUri(), $"api/internal/partner-verification/{Uri.EscapeDataString(partnerId)}");
+        var requestUri = new Uri(ResolveBaseUri(), $"{_options.RelativePath}/{Uri.EscapeDataString(partnerId)}");
 
         HttpResponseMessage response;
         try

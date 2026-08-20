@@ -47,6 +47,10 @@ through `IPartnerVerificationClient` as part of handling `POST /api/v1/partner/t
   current request (`IHttpContextAccessor`) since the simulator lives in the same project. This
   mirrors what a real external-service integration looks like, while keeping the exercise
   self-contained.
+- **The verification API's relative path is configuration, not a hardcoded string** —
+  `PartnerVerificationApiOptions.RelativePath`, bound from `PartnerVerificationApi:RelativePath`
+  in `appsettings.json` and validated on startup (`ValidateOnStart`). Swapping in a real external
+  base URL and path later is a config change, not a code change.
 - **Resilience** is handled by `Microsoft.Extensions.Http.Resilience`'s `AddStandardResilienceHandler`
   (Polly v8 under the hood) instead of hand-rolled retry loops — it bundles retry (exponential
   backoff + jitter), a per-attempt timeout, a total-request timeout, and a circuit breaker in one
