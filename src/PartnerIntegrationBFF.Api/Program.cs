@@ -1,6 +1,8 @@
 using FluentValidation;
 using PartnerIntegrationBFF.Api.Models;
+using PartnerIntegrationBFF.Api.Services;
 using PartnerIntegrationBFF.Api.Validation;
+using Polly;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,19 @@ builder.Services.AddScoped<IValidator<PartnerTransactionRequest>, PartnerTransac
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient<IPartnerVerificationClient, PartnerVerificationClient>()
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 3;
+        options.Retry.Delay = TimeSpan.FromMilliseconds(200);
+        options.Retry.BackoffType = DelayBackoffType.Exponential;
+        options.Retry.UseJitter = true;
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(2);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(4);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
+    });
 
 var app = builder.Build();
 

@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "PartnerIntegrationBFF - Step 1",
-    "description": "POST /api/v1/partner/transactions - validation test cases",
+    "name": "PartnerIntegrationBFF",
+    "description": "Step 1 (validation) and Step 2 (partner verification + resilience) test cases",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -67,6 +67,52 @@
           "host": ["{{baseUrl}}"],
           "path": ["api", "v1", "partner", "transactions"]
         }
+      }
+    },
+    {
+      "name": "5. Partner verification simulator (run a few times) -> mix of 200 / 500",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/internal/partner-verification/P-1001",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "internal", "partner-verification", "P-1001"]
+        },
+        "description": "Dummy Partner Verification API. Throws TimeoutException ~30% of calls (returns 500), otherwise returns a verified result. Call it several times to see the mix."
+      }
+    },
+    {
+      "name": "6. Valid partner, verification succeeds (with retries) -> 202 Accepted",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        },
+        "description": "The verification API fails ~30% of individual calls, but the resilience retry policy hides this from the caller almost all of the time."
+      }
+    },
+    {
+      "name": "7. Partner always unreachable -> 503 (resilience exhausted, no crash)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-ALWAYS-TIMEOUT\",\n  \"transactionReference\": \"TXN-99824\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        },
+        "description": "partnerId 'P-ALWAYS-TIMEOUT' is a test-only hook in the simulator that always times out, so retries always exhaust deterministically. The request still returns a clean 503 instead of crashing."
       }
     }
   ]
