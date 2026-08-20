@@ -17,8 +17,9 @@ endpoint contracts, and design rationale — kept out of this README so it stays
       throws `TimeoutException` ~30% of calls; a resilience strategy (retry) handles failures
       gracefully so the incoming request never crashes.
       → [docs/architecture/step-2-partner-verification.md](docs/architecture/step-2-partner-verification.md)
-- [ ] **Step 3 — Async messaging**: once a transaction is valid and the partner is verified, send
+- [x] **Step 3 — Async messaging**: once a transaction is valid and the partner is verified, send
       it to a message queue (running locally); interface + implementation for sending the message.
+      → [docs/architecture/step-3-async-messaging.md](docs/architecture/step-3-async-messaging.md)
 - [ ] **Step 4 — Quality & testing**: unit tests (xUnit/NUnit) covering the validation logic and
       the resilience/retry mechanism, with high code coverage.
 - [ ] **Bonus**: containerize the app with a `docker-compose.yml` (API + message queue), a global
@@ -27,9 +28,12 @@ endpoint contracts, and design rationale — kept out of this README so it stays
 
 ## Running the project
 
-Requires the **.NET 8 SDK**.
+Requires the **.NET 8 SDK**. Docker is optional — the API starts and validates/verifies
+transactions without it, but queueing a transaction needs RabbitMQ running (see
+[Step 3 docs](docs/architecture/step-3-async-messaging.md) for what happens without it).
 
 ```bash
+docker compose up -d rabbitmq   # optional, needed to actually queue transactions
 dotnet restore
 dotnet run --project src/PartnerIntegrationBFF.Api
 ```
@@ -54,15 +58,18 @@ A ready-to-import collection is provided at
 2. Update the `baseUrl` collection variable if your API isn't running on the default port shown
    in the console output.
 3. Run the requests in order:
-   1. **Valid transaction** → expects `202 Accepted`
+   1. **Valid transaction** → expects `202 Accepted` if RabbitMQ is running (see below), otherwise
+      `503` from the queue step — either way, not a crash
    2. **Empty payload** → expects `400` with all five fields flagged as required
    3. **Amount <= 0** → expects `400` with the amount rule violated
    4. **Invalid currency code** → expects `400` with the currency rule violated
    5. **Partner verification simulator** (call it several times) → mix of `200` and `500`,
       confirming the ~30% timeout behaviour
-   6. **Valid partner, verification succeeds** → `202 Accepted` (the retry policy hides the
-      simulator's transient `500`s from you almost every time)
+   6. **Valid partner, verification succeeds** → reaches the queueing step (the retry policy
+      hides the simulator's transient `500`s from you almost every time); `202 Accepted` only if
+      `docker compose up -d rabbitmq` is running, otherwise `503`
    7. **Partner always unreachable** (`P-ALWAYS-TIMEOUT`) → `503 Service Unavailable`, not a crash
+      (fails at verification, before the queue is ever involved)
 
 Equivalent `curl` calls (replace the port with whatever `dotnet run` printed):
 
