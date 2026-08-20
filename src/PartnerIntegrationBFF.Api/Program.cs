@@ -3,8 +3,16 @@ using PartnerIntegrationBFF.Api.Models;
 using PartnerIntegrationBFF.Api.Services;
 using PartnerIntegrationBFF.Api.Validation;
 using Polly;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
+    .ReadFrom.Configuration(context.Configuration)
+    .WriteTo.Console()
+    .WriteTo.File(
+        Path.Combine(context.HostingEnvironment.ContentRootPath, "logs", "log-.txt"),
+        rollingInterval: RollingInterval.Day));
 
 // Add services to the container.
 

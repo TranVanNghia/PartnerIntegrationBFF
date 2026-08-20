@@ -40,6 +40,11 @@ The API starts on the URL printed in the console (see
 [docs/architecture/step-1-transaction-endpoint.md#swagger-ui](docs/architecture/step-1-transaction-endpoint.md#swagger-ui)
 for how that's wired up.
 
+Logs are written both to the console and to a rolling file at
+`src/PartnerIntegrationBFF.Api/logs/log-YYYYMMDD.txt` (via Serilog, configured in `Program.cs`
+and `appsettings.json`) — this is where to look for things like the resilience/retry warnings
+logged by `PartnerVerificationClient`.
+
 ## Testing with Postman
 
 A ready-to-import collection is provided at
