@@ -41,6 +41,10 @@ reportgenerator -reports:"tests/PartnerIntegrationBFF.Api.Tests/TestResults/**/c
 Then open `coverage-report/index.html`. (`coverage-report/` and `TestResults/` are gitignored —
 generated output, not source.)
 
+![Visual Studio Test Explorer: 43/43 tests passed](images/task-4/0-test-explorer-43-passed.png)
+
+![PartnerTransactionsControllerTests.cs open alongside code coverage results](images/task-4/1-controller-tests-code-view.png)
+
 ## What's covered, and why
 
 The exercise specifically asks for unit tests "covering your validation logic and the

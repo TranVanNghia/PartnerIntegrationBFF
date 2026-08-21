@@ -7,6 +7,51 @@ downstream legacy processing.
 Each roadmap step has its own architecture doc under `docs/architecture/` — project layout,
 endpoint contracts, and design rationale — kept out of this README so it stays a quick reference.
 
+## Tools & technologies
+
+**Development environment**
+
+- [Visual Studio 2026](https://visualstudio.microsoft.com/) — primary IDE for writing, running,
+  and debugging the API, and for running/inspecting tests via Test Explorer (see the screenshots
+  in [docs/architecture/step-4-testing.md](docs/architecture/step-4-testing.md)).
+- [Google Antigravity](https://antigravity.google/) + [Claude](https://claude.com/) (Claude Code) —
+  agentic AI pair-programming used alongside Visual Studio throughout this project: scaffolding
+  each step, implementing the resilience/messaging/test code, debugging failures (e.g. the
+  BIOS/virtualization issue blocking Docker), and writing the `docs/architecture/*.md` files.
+- [Git](https://git-scm.com/) — version control, with one feature branch per roadmap step
+  (`dev/1-transaction-endpoint`, `dev/2-partner-verification-api`, `dev/3-async-messaging`,
+  `dev/4-unit-tests`).
+
+**Application stack**
+
+- **.NET 8 / ASP.NET Core Web API** — the service itself.
+- **[FluentValidation](https://docs.fluentvalidation.net/)** — request validation (Step 1).
+- **[Microsoft.Extensions.Http.Resilience](https://learn.microsoft.com/dotnet/core/resilience/)**
+  (Polly v8 under the hood) — retry/timeout/circuit-breaker for the partner verification call
+  (Step 2).
+- **[RabbitMQ.Client](https://www.rabbitmq.com/client-libraries/dotnet-api-guide)** — publishes
+  transactions to the message queue (Step 3), against either a local RabbitMQ (via Docker) or a
+  hosted [CloudAMQP](https://www.cloudamqp.com/) (LavinMQ) instance.
+- **[Serilog](https://serilog.net/)** — structured logging to console and a rolling file.
+- **[Swashbuckle](https://github.com/domaindrivendev/Swashbuckle.AspNetCore)** — Swagger/OpenAPI
+  UI for exploring and calling the API interactively.
+
+**Testing**
+
+- **[xUnit](https://xunit.net/)** + **[Moq](https://github.com/devlooped/moq)** — unit tests for
+  validation logic, the resilience/retry pipeline, and controller orchestration (Step 4).
+- **[coverlet](https://github.com/coverlet-coverage/coverlet)** +
+  **[ReportGenerator](https://github.com/danielpalme/ReportGenerator)** — code coverage collection
+  and HTML reporting.
+
+**Infrastructure & tooling**
+
+- **[Docker](https://www.docker.com/) / Docker Compose** — runs RabbitMQ locally
+  (`docker-compose.yml`).
+- **[Postman](https://www.postman.com/)** — manual API testing via the checked-in collection
+  (`postman/PartnerIntegrationBFF.postman_collection.json`).
+- **GitHub** — hosts the repository for submission.
+
 ## Roadmap
 
 - [x] **Step 1 — Endpoint** `POST /api/v1/partner/transactions`: accepts `partnerId`,
