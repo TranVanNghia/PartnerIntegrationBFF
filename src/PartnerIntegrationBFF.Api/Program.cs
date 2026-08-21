@@ -3,7 +3,6 @@ using PartnerIntegrationBFF.Api.Messaging;
 using PartnerIntegrationBFF.Api.Models;
 using PartnerIntegrationBFF.Api.Services;
 using PartnerIntegrationBFF.Api.Validation;
-using Polly;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,37 +29,10 @@ builder.Services.AddScoped<IValidator<PartnerTransactionRequest>, PartnerTransac
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Partner verification client + resilience pipeline (Step 2).
-// IHttpContextAccessor lets PartnerVerificationClient read the current request's scheme/host, since
-// the "external" verification API is actually simulated in this same project (no separate base URL).
-builder.Services.AddHttpContextAccessor();
-
-// .Validate(...).ValidateOnStart() means a missing/blank RelativePath fails fast at app startup
-// with a clear error, instead of surfacing as a confusing NullReferenceException on the first request.
-builder.Services
-    .AddOptions<PartnerVerificationApiOptions>()
-    .Bind(builder.Configuration.GetSection(PartnerVerificationApiOptions.SectionName))
-    .Validate(o => !string.IsNullOrWhiteSpace(o.RelativePath), $"{PartnerVerificationApiOptions.SectionName}:RelativePath is required.")
-    .ValidateOnStart();
-
-// AddHttpClient<TInterface, TImplementation> registers PartnerVerificationClient as a "typed client":
-// DI injects a pre-configured HttpClient into its constructor, and every request made through it
-// flows through the resilience handler configured below.
-builder.Services.AddHttpClient<IPartnerVerificationClient, PartnerVerificationClient>()
-    .AddStandardResilienceHandler(options =>
-    {
-        // Retry up to 3 times with exponential backoff + jitter — jitter spreads retries out so a
-        // burst of failing requests doesn't all retry at the exact same moment and hammer the API.
-        options.Retry.MaxRetryAttempts = 3;
-        options.Retry.Delay = TimeSpan.FromMilliseconds(200);
-        options.Retry.BackoffType = DelayBackoffType.Exponential;
-        options.Retry.UseJitter = true;
-        // Give up on a single attempt after 2s; give up on the whole call (all retries) after 10s —
-        // caps how long a caller can be kept waiting even in the worst case.
-        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(2);
-        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(4);
-        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
-    });
+// Partner verification client + resilience pipeline (Step 2). Extracted into an extension method
+// (Services/PartnerVerificationServiceCollectionExtensions.cs) so tests can build the exact same
+// pipeline against a fake handler instead of duplicating this configuration.
+builder.Services.AddPartnerVerificationClient(builder.Configuration);
 
 // Transaction queue publisher (Step 3) — RabbitMQ connection/queue settings + the publisher itself.
 // Same fail-fast-on-startup pattern as PartnerVerificationApiOptions above.

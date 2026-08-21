@@ -12,6 +12,8 @@ namespace PartnerIntegrationBFF.Api.Controllers;
 [Route("api/internal/partner-verification")]
 public class PartnerVerificationSimulatorController : ControllerBase
 {
+    // Exercise requirement: "randomly throw a TimeoutException 30% of the time, and return a
+    // valid response 70% of the time".
     private const double TimeoutProbability = 0.3;
 
     /// <summary>partnerId used to deterministically force a timeout, for demoing/testing the resilience path.</summary>
@@ -31,7 +33,8 @@ public class PartnerVerificationSimulatorController : ControllerBase
                 $"Forced timeout for partner '{partnerId}'.");
         }
 
-        // Randomly simulate a timeout based on the configured probability.
+        // Randomly simulate a timeout based on the configured probability — this is the actual
+        // "throw TimeoutException 30% of the time" behavior the exercise asks for.
         double randomValue = Random.Shared.NextDouble();
         if (randomValue < TimeoutProbability)
         {

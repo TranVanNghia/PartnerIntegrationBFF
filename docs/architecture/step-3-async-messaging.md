@@ -51,7 +51,9 @@ the queueing step fails, cleanly, as described below.
 On a locked-down/corporate machine, BIOS-level virtualization (Intel VT-x) may be disabled and
 enforced by IT policy — enabling it in the BIOS UI doesn't always stick (`Get-CimInstance
 Win32_Processor | Select VirtualizationFirmwareEnabled` still reports `False` after a reboot). In
-that case, Docker Desktop cannot run at all, and RabbitMQ can't be spun up locally as a container.
+that case, Docker Desktop cannot run at all, and RabbitMQ can't be spun up locally as a container:
+
+![Docker Desktop: "Virtualization support not detected" on a company laptop with virtualization disabled](images/task-3/5-docker-not-working-virtualization-disabled.png)
 
 A free hosted AMQP broker is a practical substitute for exercising this step end-to-end without
 Docker: [CloudAMQP](https://www.cloudamqp.com/)'s free "Loyal Lemming" plan runs LavinMQ, which

@@ -20,8 +20,9 @@ endpoint contracts, and design rationale — kept out of this README so it stays
 - [x] **Step 3 — Async messaging**: once a transaction is valid and the partner is verified, send
       it to a message queue (running locally); interface + implementation for sending the message.
       → [docs/architecture/step-3-async-messaging.md](docs/architecture/step-3-async-messaging.md)
-- [ ] **Step 4 — Quality & testing**: unit tests (xUnit/NUnit) covering the validation logic and
+- [x] **Step 4 — Quality & testing**: unit tests (xUnit/NUnit) covering the validation logic and
       the resilience/retry mechanism, with high code coverage.
+      → [docs/architecture/step-4-testing.md](docs/architecture/step-4-testing.md)
 - [ ] **Bonus**: containerize the app with a `docker-compose.yml` (API + message queue), a global
       exception handler for consistent error responses, and a documented approach to securing the
       endpoint.
@@ -92,3 +93,14 @@ curl -X POST http://localhost:5109/api/v1/partner/transactions \
   -H "Content-Type: application/json" \
   -d '{"partnerId":"P-ALWAYS-TIMEOUT","transactionReference":"TXN-99824","amount":250.00,"currency":"USD","timestamp":"2024-05-10T14:30:00Z"}'
 ```
+
+## Running tests
+
+```bash
+dotnet test
+```
+
+No Docker/broker/network needed — the resilience/retry mechanism is tested against a fake HTTP
+handler, not a live service. See [docs/architecture/step-4-testing.md](docs/architecture/step-4-testing.md)
+for what's covered, why some infrastructure code is intentionally excluded, and how to generate a
+code coverage report.

@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/PartnerIntegrationBFF.Api/PartnerIntegrationBFF.Api.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PartnerIntegrationBFF.Api.Tests/PartnerIntegrationBFF.Api.Tests.csproj" />
+  </Folder>
 </Solution>
