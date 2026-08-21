@@ -29,10 +29,59 @@ docker-compose.yml                             # Local RabbitMQ broker
 4. On `TransactionQueueUnavailableException`, returns `503 Service Unavailable` instead of
    crashing or silently dropping the transaction.
 
+## Prerequisite: Docker Desktop
+
+Running RabbitMQ locally requires Docker. If `docker --version` doesn't work in your terminal:
+
+1. Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (WSL 2
+   backend, the installer default).
+2. Start Docker Desktop and wait until it reports "Docker Desktop is running".
+3. Verify from PowerShell:
+   ```powershell
+   docker --version
+   docker ps
+   ```
+   Both should run without a "command not found" error.
+
+Without Docker, the API still starts and validation/verification (Steps 1-2) still work — only
+the queueing step fails, cleanly, as described below.
+
+### If Docker itself won't start ("virtualization support not detected")
+
+On a locked-down/corporate machine, BIOS-level virtualization (Intel VT-x) may be disabled and
+enforced by IT policy — enabling it in the BIOS UI doesn't always stick (`Get-CimInstance
+Win32_Processor | Select VirtualizationFirmwareEnabled` still reports `False` after a reboot). In
+that case, Docker Desktop cannot run at all, and RabbitMQ can't be spun up locally as a container.
+
+A free hosted AMQP broker is a practical substitute for exercising this step end-to-end without
+Docker: [CloudAMQP](https://www.cloudamqp.com/)'s free "Loyal Lemming" plan runs LavinMQ, which
+speaks the same AMQP 0-9-1 protocol as RabbitMQ, so `RabbitMQ.Client` connects to it exactly as it
+would to a local broker — just over TLS on port `5671` instead of plaintext `5672`. That's what
+`RabbitMqOptions.UseTls` and `RabbitMqOptions.VirtualHost` are for (see Design choices below).
+
+Configure it locally via [.NET User Secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets)
+— never commit real broker credentials into `appsettings.json`:
+
+```bash
+cd src/PartnerIntegrationBFF.Api
+dotnet user-secrets init
+dotnet user-secrets set "RabbitMq:HostName" "<your-instance>.lmq.cloudamqp.com"
+dotnet user-secrets set "RabbitMq:Port" "5671"
+dotnet user-secrets set "RabbitMq:UserName" "<user>"
+dotnet user-secrets set "RabbitMq:Password" "<password>"
+dotnet user-secrets set "RabbitMq:VirtualHost" "<vhost>"   # CloudAMQP free tier: same as the username
+dotnet user-secrets set "RabbitMq:UseTls" "true"
+```
+
+User Secrets override `appsettings.json` only on your machine and are never checked into git.
+`appsettings.json` itself stays pointed at `localhost`/plaintext for `docker-compose.yml`, which
+is what a reviewer with a working Docker setup will actually run.
+
 ## Running RabbitMQ locally
 
 ```bash
 docker compose up -d rabbitmq
+docker ps   # wait until the container's STATUS shows "healthy" (~10-15s on first run)
 ```
 
 This starts RabbitMQ with the management UI at http://localhost:15672 (login `guest`/`guest`),
@@ -53,7 +102,9 @@ transaction. AMQP is exposed on the standard port `5672`, matching the defaults 
   under concurrent requests).
 - **Connection/queue settings are configuration**, not hardcoded — `RabbitMqOptions`, bound from
   `RabbitMq:*` in `appsettings.json` and validated on startup, following the same pattern as
-  `PartnerVerificationApiOptions` from Step 2.
+  `PartnerVerificationApiOptions` from Step 2. `VirtualHost` and `UseTls` (both optional, default
+  `"/"` and `false`) let the same code target either a local plaintext broker or a TLS-only hosted
+  one (e.g. CloudAMQP) without any code change — see the Docker fallback note above.
 - **Publish failures never crash the request.** Connection errors, broken channels, and other
   broker-level exceptions are caught and wrapped in a single `TransactionQueueUnavailableException`;
   the controller turns that into a `503 ProblemDetails`, mirroring how Step 2 handles partner
@@ -65,18 +116,29 @@ transaction. AMQP is exposed on the standard port `5672`, matching the defaults 
   on the first publish, so the app starts fine either way, and a transaction attempted while the
   broker is down cleanly returns `503` (verified below) rather than a `500` or a dropped process.
 
-## Testing
+## Testing with Postman
 
-Without Docker/RabbitMQ running, you can still exercise the failure path — start the API and post
-a transaction; the connection attempt fails and the request returns a clean `503`:
+Requests 8-9 in
+[`postman/PartnerIntegrationBFF.postman_collection.json`](../../postman/PartnerIntegrationBFF.postman_collection.json):
+
+8. **Queue transaction** (`docker compose up -d rabbitmq` first) → `202 Accepted`; the message
+   shows up on the `partner-transactions` queue in the management UI
+   (http://localhost:15672, `guest`/`guest`, **Queues** tab → **Ready/Total** count increases).
+   Use a fresh `transactionReference` each run so you can tell messages apart.
+9. **Queue unavailable** (`docker compose stop rabbitmq`, or just don't start it) → validation and
+   partner verification still pass, but the publish step fails, so the API returns a clean `503`
+   instead of a `500` or a crash.
+
+Equivalent `curl` calls (replace the port with whatever `dotnet run` printed):
 
 ```bash
+# Without RabbitMQ running: 503, "The message queue is temporarily unavailable. Please retry later."
 curl -X POST http://localhost:5109/api/v1/partner/transactions \
   -H "Content-Type: application/json" \
   -d '{"partnerId":"P-1001","transactionReference":"TXN-MQ-1","amount":250.00,"currency":"USD","timestamp":"2024-05-10T14:30:00Z"}'
-# -> 503, "The message queue is temporarily unavailable. Please retry later."
-```
 
-With RabbitMQ running (`docker compose up -d rabbitmq`), the same request returns `202 Accepted`,
-and the message appears on the `partner-transactions` queue in the management UI
-(http://localhost:15672 → Queues).
+# With `docker compose up -d rabbitmq` running: 202 Accepted, message lands on the queue
+curl -X POST http://localhost:5109/api/v1/partner/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"partnerId":"P-1001","transactionReference":"TXN-MQ-2","amount":250.00,"currency":"USD","timestamp":"2024-05-10T14:30:00Z"}'
+```

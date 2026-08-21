@@ -9,4 +9,8 @@ public class RabbitMqOptions
     public required string UserName { get; set; }
     public required string Password { get; set; }
     public required string QueueName { get; set; }
+    public string VirtualHost { get; set; } = "/";
+
+    /// <summary>Set true for TLS-only hosted brokers (e.g. CloudAMQP), typically on port 5671.</summary>
+    public bool UseTls { get; set; }
 }

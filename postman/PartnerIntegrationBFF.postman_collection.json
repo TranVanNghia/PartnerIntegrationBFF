@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "PartnerIntegrationBFF",
-    "description": "Step 1 (validation) and Step 2 (partner verification + resilience) test cases",
+    "description": "Step 1 (validation), Step 2 (partner verification + resilience), and Step 3 (async messaging) test cases",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,7 +9,7 @@
   ],
   "item": [
     {
-      "name": "1. Valid transaction -> 202 Accepted",
+      "name": "1. Valid transaction -> 202 Accepted (requires RabbitMQ running, see #8)",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -82,7 +82,7 @@
       }
     },
     {
-      "name": "6. Valid partner, verification succeeds (with retries) -> 202 Accepted",
+      "name": "6. Valid partner, verification succeeds (with retries) -> 202 if RabbitMQ running, else 503",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -113,6 +113,40 @@
           "path": ["api", "v1", "partner", "transactions"]
         },
         "description": "partnerId 'P-ALWAYS-TIMEOUT' is a test-only hook in the simulator that always times out, so retries always exhaust deterministically. The request still returns a clean 503 instead of crashing."
+      }
+    },
+    {
+      "name": "8. Queue transaction -> 202 Accepted (requires RabbitMQ running)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-MQ-1\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        },
+        "description": "Run `docker compose up -d rabbitmq` first. On success this returns 202 Accepted and the message shows up on the 'partner-transactions' queue in the RabbitMQ management UI (http://localhost:15672, guest/guest, Queues tab). Use a fresh transactionReference each time so you can tell new messages apart."
+      }
+    },
+    {
+      "name": "9. Queue unavailable (RabbitMQ stopped) -> 503, no crash",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-MQ-2\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "partner", "transactions"]
+        },
+        "description": "Run `docker compose stop rabbitmq` (or just don't start it) first. Validation and partner verification still succeed, but the publish step fails, so the API returns a clean 503 ProblemDetails instead of a 500 or a crash."
       }
     }
   ]

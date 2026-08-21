@@ -88,6 +88,10 @@ public class RabbitMqTransactionQueuePublisher : ITransactionQueuePublisher, IAs
                 Port = _options.Port,
                 UserName = _options.UserName,
                 Password = _options.Password,
+                VirtualHost = _options.VirtualHost,
+                Ssl = _options.UseTls
+                    ? new SslOption { Enabled = true, ServerName = _options.HostName }
+                    : new SslOption { Enabled = false },
             };
 
             _connection = await factory.CreateConnectionAsync(cancellationToken);
