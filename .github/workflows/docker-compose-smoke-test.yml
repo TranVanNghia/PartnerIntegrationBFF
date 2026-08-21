@@ -1,0 +1,68 @@
+name: Docker Compose smoke test
+
+# Neither the author's nor Claude's machine had a working Docker install while building this
+# project (see docs/architecture/step-3-async-messaging.md and docs/architecture/bonus.md for
+# why) — GitHub's runners have Docker preinstalled, so this workflow is the real verification that
+# docker-compose.yml actually builds the API image and gets both containers talking to each other.
+# It runs the "Docker Compose smoke test" folder of the Postman collection via Newman (Postman's
+# CLI runner) against the real containers, instead of ad-hoc curl calls.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - "src/PartnerIntegrationBFF.Api/Dockerfile"
+      - "src/PartnerIntegrationBFF.Api/**"
+      - "postman/**"
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "src/PartnerIntegrationBFF.Api/Dockerfile"
+      - "src/PartnerIntegrationBFF.Api/**"
+      - "postman/**"
+  workflow_dispatch: {}
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for RabbitMQ to report healthy
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' partner-integration-bff-rabbitmq 2>/dev/null || echo "starting")
+            echo "rabbitmq health: $status"
+            [ "$status" = "healthy" ] && exit 0
+            sleep 2
+          done
+          echo "RabbitMQ never became healthy" >&2
+          exit 1
+
+      - name: Wait for the API to accept connections
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null http://localhost:8080/api/internal/partner-verification/P-1001; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API never became reachable" >&2
+          exit 1
+
+      - name: Run the Postman "Docker Compose smoke test" folder via Newman
+        run: |
+          npx --yes newman run postman/PartnerIntegrationBFF.postman_collection.json \
+            --folder "Docker Compose smoke test (targets {{dockerBaseUrl}})" \
+            --env-var dockerBaseUrl=http://localhost:8080
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

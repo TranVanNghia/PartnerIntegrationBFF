@@ -1,11 +1,16 @@
 {
-  "_comment": "Copy this file to appsettings.Local.json (gitignored) and fill in real values. Used to point RabbitMq at a hosted broker (e.g. CloudAMQP) when Docker/local RabbitMQ isn't available. See docs/architecture/step-3-async-messaging.md.",
+  "_comment": "Copy this file to appsettings.Local.json (gitignored) and fill in real values.",
   "RabbitMq": {
+    "_comment": "Point RabbitMq at a hosted broker (e.g. CloudAMQP) when Docker/local RabbitMQ isn't available. See docs/architecture/step-3-async-messaging.md.",
     "HostName": "your-instance.lmq.cloudamqp.com",
     "Port": 5671,
     "UserName": "your-username",
     "Password": "your-password",
     "VirtualHost": "your-vhost",
     "UseTls": true
+  },
+  "Security": {
+    "_comment": "Flip to true to try the JWT flow (Postman requests 10-14). See docs/architecture/bonus.md.",
+    "RequireAuthentication": true
   }
 }

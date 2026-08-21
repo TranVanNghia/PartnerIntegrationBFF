@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/logs/
+**/TestResults/
+.git/
+.vs/
+docs/
+postman/
+*.md
+appsettings.Local.json
+coverage-report/

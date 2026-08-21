@@ -1,8 +1,10 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.Extensions.Options;
 using PartnerIntegrationBFF.Api.Messaging;
 using PartnerIntegrationBFF.Api.Models;
+using PartnerIntegrationBFF.Api.Security;
 using PartnerIntegrationBFF.Api.Services;
 
 namespace PartnerIntegrationBFF.Api.Controllers;
@@ -14,23 +16,30 @@ public class PartnerTransactionsController : ControllerBase
     private readonly IValidator<PartnerTransactionRequest> _validator;
     private readonly IPartnerVerificationClient _partnerVerificationClient;
     private readonly ITransactionQueuePublisher _transactionQueuePublisher;
+    private readonly PartnerAuthorizationService _partnerAuthorizationService;
+    private readonly SecurityOptions _securityOptions;
     private readonly ILogger<PartnerTransactionsController> _logger;
 
     public PartnerTransactionsController(
         IValidator<PartnerTransactionRequest> validator,
         IPartnerVerificationClient partnerVerificationClient,
         ITransactionQueuePublisher transactionQueuePublisher,
+        PartnerAuthorizationService partnerAuthorizationService,
+        IOptions<SecurityOptions> securityOptions,
         ILogger<PartnerTransactionsController> logger)
     {
         _validator = validator;
         _partnerVerificationClient = partnerVerificationClient;
         _transactionQueuePublisher = transactionQueuePublisher;
+        _partnerAuthorizationService = partnerAuthorizationService;
+        _securityOptions = securityOptions.Value;
         _logger = logger;
     }
 
     [HttpPost]
     [ProducesResponseType(typeof(PartnerTransactionAcceptedResponse), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Post([FromBody] PartnerTransactionRequest request, CancellationToken cancellationToken)
@@ -48,6 +57,17 @@ public class PartnerTransactionsController : ControllerBase
             }
 
             return ValidationProblem(ModelState);
+        }
+
+        // Bonus: when Security:RequireAuthentication is on, RequireAuthenticationMiddleware has
+        // already guaranteed the caller presented a valid JWT (401 otherwise, never reaching here).
+        // This is the extra business check on top: that token must belong to *this* partnerId.
+        if (_securityOptions.RequireAuthentication &&
+            _partnerAuthorizationService.Authorize(User, request.PartnerId!) == PartnerAuthorizationResult.PartnerMismatch)
+        {
+            return Problem(
+                title: "The authenticated partner does not match partnerId in the request body.",
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         // Step 2: verify the partner against the (resilient) Partner Verification API.

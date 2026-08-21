@@ -20,7 +20,7 @@ endpoint contracts, and design rationale — kept out of this README so it stays
   BIOS/virtualization issue blocking Docker), and writing the `docs/architecture/*.md` files.
 - [Git](https://git-scm.com/) — version control, with one feature branch per roadmap step
   (`dev/1-transaction-endpoint`, `dev/2-partner-verification-api`, `dev/3-async-messaging`,
-  `dev/4-unit-tests`).
+  `dev/4-unit-tests`, `dev/5-bonus`).
 
 **Application stack**
 
@@ -68,15 +68,26 @@ endpoint contracts, and design rationale — kept out of this README so it stays
 - [x] **Step 4 — Quality & testing**: unit tests (xUnit/NUnit) covering the validation logic and
       the resilience/retry mechanism, with high code coverage.
       → [docs/architecture/step-4-testing.md](docs/architecture/step-4-testing.md)
-- [ ] **Bonus**: containerize the app with a `docker-compose.yml` (API + message queue), a global
+- [x] **Bonus**: containerize the app with a `docker-compose.yml` (API + message queue), a global
       exception handler for consistent error responses, and a documented approach to securing the
       endpoint.
+      → [docs/architecture/bonus.md](docs/architecture/bonus.md)
 
 ## Running the project
 
-Requires the **.NET 8 SDK**. Docker is optional — the API starts and validates/verifies
-transactions without it, but queueing a transaction needs RabbitMQ running (see
-[Step 3 docs](docs/architecture/step-3-async-messaging.md) for what happens without it).
+Two ways to run it — pick whichever matches what's available to you.
+
+**Option 1 — Docker Compose (runs everything: API + RabbitMQ)**
+
+```bash
+docker compose up -d --build
+```
+
+The API is reachable at `http://localhost:8080`. See
+[docs/architecture/bonus.md](docs/architecture/bonus.md) for how the containers are wired together
+(and a testing caveat — this specific path needs a machine with a working Docker install).
+
+**Option 2 — `dotnet run` (Docker optional)**
 
 ```bash
 docker compose up -d rabbitmq   # optional, needed to actually queue transactions
@@ -88,7 +99,13 @@ The API starts on the URL printed in the console (see
 `src/PartnerIntegrationBFF.Api/Properties/launchSettings.json`), with Swagger UI available at
 `/swagger` in the Development environment — see
 [docs/architecture/step-1-transaction-endpoint.md#swagger-ui](docs/architecture/step-1-transaction-endpoint.md#swagger-ui)
-for how that's wired up.
+for how that's wired up. The API starts and validates/verifies transactions without Docker, but
+queueing a transaction needs RabbitMQ running (see
+[Step 3 docs](docs/architecture/step-3-async-messaging.md) for what happens without it).
+
+Either way, unhandled errors return a consistent `ProblemDetails` JSON body (see
+[docs/architecture/bonus.md](docs/architecture/bonus.md)), and every endpoint can be locked behind
+a JWT by setting `Security:RequireAuthentication: true` (default `false`) — same doc.
 
 Logs are written both to the console and to a rolling file at
 `src/PartnerIntegrationBFF.Api/logs/log-YYYYMMDD.txt` (via Serilog, configured in `Program.cs`
@@ -119,6 +136,12 @@ A ready-to-import collection is provided at
    8. **Queue transaction** (`docker compose up -d rabbitmq` first) → `202 Accepted`; check the
       message landed on the `partner-transactions` queue at http://localhost:15672 (`guest`/`guest`)
    9. **Queue unavailable** (`docker compose stop rabbitmq`, or don't start it) → `503`, not a crash
+   10. **Get token** (correct `clientSecret`) → `200` + JWT, saved to `{{token}}` — requires
+       `Security:RequireAuthentication: true` (see [docs/architecture/bonus.md](docs/architecture/bonus.md))
+   11. **Get token** (wrong `clientSecret`) → `401`
+   12. **Transaction with no token** → `401`
+   13. **Transaction with `{{token}}` for a different partner than the body** → `403`
+   14. **Transaction with `{{token}}` matching the body's partner** → continues the normal pipeline
 
 Each step's architecture doc has annotated screenshots of these requests running (Postman +
 Swagger UI side by side) — see

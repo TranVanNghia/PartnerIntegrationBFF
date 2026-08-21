@@ -1,13 +1,16 @@
+using System.Security.Claims;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using PartnerIntegrationBFF.Api.Controllers;
 using PartnerIntegrationBFF.Api.Messaging;
 using PartnerIntegrationBFF.Api.Models;
+using PartnerIntegrationBFF.Api.Security;
 using PartnerIntegrationBFF.Api.Services;
 
 namespace PartnerIntegrationBFF.Api.Tests.Controllers;
@@ -17,14 +20,16 @@ public class PartnerTransactionsControllerTests
     private readonly Mock<IValidator<PartnerTransactionRequest>> _validator = new();
     private readonly Mock<IPartnerVerificationClient> _partnerVerificationClient = new();
     private readonly Mock<ITransactionQueuePublisher> _transactionQueuePublisher = new();
-    private readonly PartnerTransactionsController _controller;
+    private readonly PartnerAuthorizationService _partnerAuthorizationService = new();
 
-    public PartnerTransactionsControllerTests()
+    private PartnerTransactionsController BuildController(bool requireAuthentication = false, ClaimsPrincipal? user = null)
     {
-        _controller = new PartnerTransactionsController(
+        return new PartnerTransactionsController(
             _validator.Object,
             _partnerVerificationClient.Object,
             _transactionQueuePublisher.Object,
+            _partnerAuthorizationService,
+            Options.Create(new SecurityOptions { RequireAuthentication = requireAuthentication, ClientSecret = "test-secret" }),
             new Mock<ILogger<PartnerTransactionsController>>().Object)
         {
             // Problem()/ValidationProblem() resolve ProblemDetailsFactory from RequestServices —
@@ -34,10 +39,21 @@ public class PartnerTransactionsControllerTests
                 HttpContext = new DefaultHttpContext
                 {
                     RequestServices = new ServiceCollection().AddMvc().Services.BuildServiceProvider(),
+                    User = user ?? new ClaimsPrincipal(new ClaimsIdentity()),
                 },
             },
         };
     }
+
+    private readonly PartnerTransactionsController _controller;
+
+    public PartnerTransactionsControllerTests()
+    {
+        _controller = BuildController();
+    }
+
+    private static ClaimsPrincipal AuthenticatedUser(string partnerId) => new(
+        new ClaimsIdentity([new Claim("partnerId", partnerId)], authenticationType: "Bearer"));
 
     private static PartnerTransactionRequest SampleRequest() => new()
     {
@@ -123,7 +139,7 @@ public class PartnerTransactionsControllerTests
             .Setup(c => c.VerifyPartnerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         _transactionQueuePublisher
-            .Setup(p => p.PublishAsync(It.IsAny<TransactionQueueMessage>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.PublishAsync(It.IsAny<TransactionQueueMessage>(), It .IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var request = SampleRequest();
@@ -143,5 +159,56 @@ public class PartnerTransactionsControllerTests
                     m.Currency == request.Currency),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Post_WhenAuthenticationRequiredAndTokenPartnerDiffersFromBody_Returns403()
+    {
+        SetValidationResult(isValid: true);
+        var controller = BuildController(requireAuthentication: true, user: AuthenticatedUser("P-OTHER"));
+
+        var result = await controller.Post(SampleRequest(), CancellationToken.None);
+
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, objectResult.StatusCode);
+        _partnerVerificationClient.VerifyNoOtherCalls();
+        _transactionQueuePublisher.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Post_WhenAuthenticationRequiredAndTokenPartnerMatchesBody_ProceedsTo202()
+    {
+        SetValidationResult(isValid: true);
+        _partnerVerificationClient
+            .Setup(c => c.VerifyPartnerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _transactionQueuePublisher
+            .Setup(p => p.PublishAsync(It.IsAny<TransactionQueueMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var controller = BuildController(requireAuthentication: true, user: AuthenticatedUser("P-1001"));
+
+        var result = await controller.Post(SampleRequest(), CancellationToken.None);
+
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status202Accepted, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_WhenAuthenticationNotRequired_IgnoresUserClaimsEntirely()
+    {
+        // Default flag (false, no user set up) — the pre-existing behaviour from before Security
+        // was added must keep working unchanged.
+        SetValidationResult(isValid: true);
+        _partnerVerificationClient
+            .Setup(c => c.VerifyPartnerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _transactionQueuePublisher
+            .Setup(p => p.PublishAsync(It.IsAny<TransactionQueueMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await _controller.Post(SampleRequest(), CancellationToken.None);
+
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status202Accepted, objectResult.StatusCode);
     }
 }

@@ -1,6 +1,11 @@
+using System.Text;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using PartnerIntegrationBFF.Api.ErrorHandling;
 using PartnerIntegrationBFF.Api.Messaging;
 using PartnerIntegrationBFF.Api.Models;
+using PartnerIntegrationBFF.Api.Security;
 using PartnerIntegrationBFF.Api.Services;
 using PartnerIntegrationBFF.Api.Validation;
 using Serilog;
@@ -20,6 +25,11 @@ builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
         rollingInterval: RollingInterval.Day));
 
 // Add services to the container.
+
+// Global exception handler (Bonus) — catches anything that isn't already handled closer to where
+// it happened, and formats it as a consistent ProblemDetails response.
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // MVC + request validation (Step 1).
 builder.Services.AddControllers();
@@ -46,9 +56,51 @@ builder.Services
 // meant to be shared across all requests for the lifetime of the app (see its own comments for why).
 builder.Services.AddSingleton<ITransactionQueuePublisher, RabbitMqTransactionQueuePublisher>();
 
+// Security (Bonus): JWT issuance + a global "is authentication required at all" toggle.
+// See docs/architecture/bonus.md for the full design and its simplifications.
+builder.Services
+    .AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+    .Validate(o => !string.IsNullOrWhiteSpace(o.SigningKey) && o.SigningKey.Length >= 32,
+        $"{JwtOptions.SectionName}:SigningKey must be at least 32 characters (HMAC-SHA256).")
+    .ValidateOnStart();
+builder.Services
+    .AddOptions<SecurityOptions>()
+    .Bind(builder.Configuration.GetSection(SecurityOptions.SectionName))
+    .Validate(o => !string.IsNullOrWhiteSpace(o.ClientSecret), $"{SecurityOptions.SectionName}:ClientSecret is required.")
+    .ValidateOnStart();
+builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddSingleton<PartnerAuthorizationService>();
+
+// The JwtOptions binding above already validates SigningKey is non-null/long-enough on startup,
+// but that validation hasn't run yet at this point in Program.cs — so options are read directly
+// from configuration here rather than via the validated IOptions<JwtOptions>.
+var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["SigningKey"] ?? string.Empty)),
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// Registered first so it wraps every other middleware below.
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -56,6 +108,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+
+// Bonus: enforces authentication across the whole API when Security:RequireAuthentication is on
+// (default off — see SecurityOptions). Must run after UseAuthentication (needs context.User
+// populated) and before UseAuthorization/MapControllers.
+app.UseMiddleware<RequireAuthenticationMiddleware>();
 
 app.UseAuthorization();
 

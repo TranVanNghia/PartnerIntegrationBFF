@@ -1,26 +1,49 @@
 {
   "info": {
     "name": "PartnerIntegrationBFF",
-    "description": "Step 1 (validation), Step 2 (partner verification + resilience), and Step 3 (async messaging) test cases",
+    "description": "Step 1 (validation), Step 2 (partner verification + resilience), Step 3 (async messaging), and Bonus (JWT security) test cases",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:5109" }
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:7051"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "dockerBaseUrl",
+      "value": "http://localhost:8080"
+    }
   ],
   "item": [
     {
       "name": "1. Valid transaction -> 202 Accepted (requires RabbitMQ running, see #8)",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         }
       }
     },
@@ -28,12 +51,27 @@
       "name": "2. Empty payload -> 400 (all fields required)",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{}" },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         }
       }
     },
@@ -41,15 +79,27 @@
       "name": "3. Amount <= 0 -> 400",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": -5,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         }
       }
     },
@@ -57,15 +107,27 @@
       "name": "4. Invalid currency code -> 400",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": 250,\n  \"currency\": \"XXX\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         }
       }
     },
@@ -75,8 +137,15 @@
         "method": "GET",
         "url": {
           "raw": "{{baseUrl}}/api/internal/partner-verification/P-1001",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "internal", "partner-verification", "P-1001"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "internal",
+            "partner-verification",
+            "P-1001"
+          ]
         },
         "description": "Dummy Partner Verification API. Throws TimeoutException ~30% of calls (returns 500), otherwise returns a verified result. Call it several times to see the mix."
       }
@@ -85,15 +154,27 @@
       "name": "6. Valid partner, verification succeeds (with retries) -> 202 if RabbitMQ running, else 503",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-99823\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         },
         "description": "The verification API fails ~30% of individual calls, but the resilience retry policy hides this from the caller almost all of the time."
       }
@@ -102,15 +183,27 @@
       "name": "7. Partner always unreachable -> 503 (resilience exhausted, no crash)",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-ALWAYS-TIMEOUT\",\n  \"transactionReference\": \"TXN-99824\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         },
         "description": "partnerId 'P-ALWAYS-TIMEOUT' is a test-only hook in the simulator that always times out, so retries always exhaust deterministically. The request still returns a clean 503 instead of crashing."
       }
@@ -119,15 +212,27 @@
       "name": "8. Queue transaction -> 202 Accepted (requires RabbitMQ running)",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-MQ-1\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         },
         "description": "Run `docker compose up -d rabbitmq` first. On success this returns 202 Accepted and the message shows up on the 'partner-transactions' queue in the RabbitMQ management UI (http://localhost:15672, guest/guest, Queues tab). Use a fresh transactionReference each time so you can tell new messages apart."
       }
@@ -136,18 +241,309 @@
       "name": "9. Queue unavailable (RabbitMQ stopped) -> 503, no crash",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-MQ-2\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/partner/transactions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "partner", "transactions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
         },
         "description": "Run `docker compose stop rabbitmq` (or just don't start it) first. Validation and partner verification still succeed, but the publish step fails, so the API returns a clean 503 ProblemDetails instead of a 500 or a crash."
       }
+    },
+    {
+      "name": "10. Get token (correct clientSecret) -> 200, saves {{token}}",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('status is 200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('token', body.accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"clientSecret\": \"dev-only-client-secret-change-me\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/token",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "token"
+          ]
+        },
+        "description": "Requires Security:RequireAuthentication = true (see appsettings.Local.json.example) — otherwise all bonus-security requests 10-14 are moot since the middleware bypasses everything. clientSecret must match Security:ClientSecret in appsettings.json. On success, saves the JWT to the {{token}} collection variable used by requests 13-14."
+      }
+    },
+    {
+      "name": "11. Get token (wrong clientSecret) -> 401",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"clientSecret\": \"wrong-secret\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/token",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "token"
+          ]
+        }
+      }
+    },
+    {
+      "name": "12. Transaction without a token (RequireAuthentication=true) -> 401",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-SEC-1\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
+        },
+        "description": "No Authorization header sent. RequireAuthenticationMiddleware rejects this before it ever reaches the controller."
+      }
+    },
+    {
+      "name": "13. Transaction with a token for a different partner -> 403",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-9999\",\n  \"transactionReference\": \"TXN-SEC-2\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
+        },
+        "description": "{{token}} was issued for partnerId P-1001 (request #10), but the body here claims to be P-9999 — the token is valid (passes the 401 check) but doesn't authorize this partnerId (403)."
+      }
+    },
+    {
+      "name": "14. Transaction with a token for the matching partner -> continues pipeline normally",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-SEC-3\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/partner/transactions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "partner",
+            "transactions"
+          ]
+        },
+        "description": "{{token}}'s partnerId (P-1001) matches the body's partnerId, so this passes both the 401 and 403 checks and continues into the normal Step 1-3 pipeline (202/422/503 depending on verification/queue state, same as request #1)."
+      }
+    },
+    {
+      "name": "Docker Compose smoke test (targets {{dockerBaseUrl}})",
+      "description": "Standalone requests for verifying `docker compose up -d --build` (Bonus item A) — deliberately separate from requests 1-14 above, which target `{{baseUrl}}` (the `dotnet run` dev workflow). Run via `docker compose up -d --build` then either send these manually with `dockerBaseUrl` set to your Docker host, or let .github/workflows/docker-compose-smoke-test.yml run them automatically with Newman on every push/PR. RequireAuthentication defaults to false in the image, so no token is needed here.",
+      "item": [
+        {
+          "name": "15. Docker: Valid transaction -> 202 Accepted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 503 is only acceptable if partner verification's ~30% random failure struck all 3",
+                  "// retries (see docs/architecture/step-2-partner-verification.md) — a ~2.7% chance, not a bug.",
+                  "pm.test('status is 202 (or rarely 503)', () => [202, 503].includes(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerId\": \"P-1001\",\n  \"transactionReference\": \"TXN-DOCKER-1\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2024-05-10T14:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{dockerBaseUrl}}/api/v1/partner/transactions",
+              "host": [
+                "{{dockerBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partner",
+                "transactions"
+              ]
+            }
+          },
+          "description": "Confirms the api container can reach the rabbitmq container over the Compose network (RabbitMq__HostName=rabbitmq) and successfully queue a transaction — the same end-to-end check as request #1, just against the Dockerized stack instead of `dotnet run`."
+        },
+        {
+          "name": "16. Docker: Empty payload -> 400 (all fields required)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{dockerBaseUrl}}/api/v1/partner/transactions",
+              "host": [
+                "{{dockerBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partner",
+                "transactions"
+              ]
+            }
+          },
+          "description": "Same validation rules apply inside the container as under `dotnet run` — confirms the published image wasn't built with stale/missing code."
+        },
+        {
+          "name": "17. Docker: Partner verification simulator reachable -> 200 or 500",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 500', () => [200, 500].includes(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{dockerBaseUrl}}/api/internal/partner-verification/P-1001",
+              "host": [
+                "{{dockerBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "partner-verification",
+                "P-1001"
+              ]
+            }
+          },
+          "description": "Confirms the internal simulator endpoint is reachable inside the container (used as the CI workflow's readiness probe before it sends request #15)."
+        }
+      ]
     }
   ]
 }
