@@ -30,7 +30,13 @@ public class RabbitMqTransactionQueuePublisher : ITransactionQueuePublisher, IAs
         try
         {
             var connection = await GetOrCreateConnectionAsync(cancellationToken);
+
+            // A channel is a lightweight, single-use "session" over the shared connection — RabbitMQ
+            // channels aren't thread-safe, so every publish gets its own and disposes it afterwards.
             await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+
+            // Idempotent: creates the queue if it doesn't exist yet, no-ops if it already does.
+            // durable: true means the queue definition itself survives a broker restart.
             await channel.QueueDeclareAsync(
                 queue: _options.QueueName,
                 durable: true,
@@ -41,10 +47,16 @@ public class RabbitMqTransactionQueuePublisher : ITransactionQueuePublisher, IAs
             var body = JsonSerializer.SerializeToUtf8Bytes(message);
             var properties = new BasicProperties
             {
+                // Persistent = message itself is written to disk by the broker, so an already-queued
+                // transaction survives a broker restart (paired with the durable queue above).
                 Persistent = true,
                 ContentType = "application/json",
             };
 
+            // Publish with no exchange ("" = default exchange), routed straight to the queue named
+            // by routingKey. mandatory: false means RabbitMQ silently drops it if the queue somehow
+            // doesn't exist, instead of returning it — acceptable here since QueueDeclareAsync above
+            // just guaranteed the queue exists.
             await channel.BasicPublishAsync(
                 exchange: string.Empty,
                 routingKey: _options.QueueName,
@@ -59,6 +71,9 @@ public class RabbitMqTransactionQueuePublisher : ITransactionQueuePublisher, IAs
                 message.PartnerId,
                 _options.QueueName);
         }
+        // Catches every way the broker call above can fail — can't connect, connection/channel died
+        // mid-call, or the operation was rejected — and turns them all into one exception type so the
+        // controller only has to handle a single failure case instead of knowing RabbitMQ internals.
         catch (Exception ex) when (ex is BrokerUnreachableException or SocketException or AlreadyClosedException or OperationInterruptedException)
         {
             _logger.LogWarning(ex, "Failed to publish transaction {TransactionReference} to the message queue", message.TransactionReference);
@@ -69,14 +84,20 @@ public class RabbitMqTransactionQueuePublisher : ITransactionQueuePublisher, IAs
 
     private async Task<IConnection> GetOrCreateConnectionAsync(CancellationToken cancellationToken)
     {
+        // Fast path: reuse the existing connection without ever taking the lock — this is the case
+        // for almost every request once the connection has been established once.
         if (_connection is { IsOpen: true })
         {
             return _connection;
         }
 
+        // Slow path: no connection yet, or it dropped. Lock so concurrent requests arriving at the
+        // same time don't each open their own connection to the broker.
         await _connectionLock.WaitAsync(cancellationToken);
         try
         {
+            // Re-check after acquiring the lock: another request may have already reconnected while
+            // this one was waiting.
             if (_connection is { IsOpen: true })
             {
                 return _connection;
@@ -89,6 +110,8 @@ public class RabbitMqTransactionQueuePublisher : ITransactionQueuePublisher, IAs
                 UserName = _options.UserName,
                 Password = _options.Password,
                 VirtualHost = _options.VirtualHost,
+                // UseTls distinguishes a local plaintext broker (docker-compose, port 5672) from a
+                // TLS-only hosted one like CloudAMQP (port 5671) — same code, different config.
                 Ssl = _options.UseTls
                     ? new SslOption { Enabled = true, ServerName = _options.HostName }
                     : new SslOption { Enabled = false },

@@ -37,16 +37,27 @@ public class PartnerVerificationClient : IPartnerVerificationClient
         HttpResponseMessage response;
         try
         {
+            // _httpClient already has the standard resilience handler attached (Program.cs), so by
+            // the time GetAsync returns or throws here, every retry attempt has already happened —
+            // this is the *final* outcome, not the first attempt.
             response = await _httpClient.GetAsync(requestUri, cancellationToken);
         }
         catch (Exception ex) when (ex is HttpRequestException or TimeoutRejectedException or BrokenCircuitException or TaskCanceledException)
         {
+            // Covers every way the resilience pipeline can give up: the connection itself failed
+            // (HttpRequestException), every attempt timed out (TimeoutRejectedException), the circuit
+            // breaker is open and short-circuiting new calls (BrokenCircuitException), or the request
+            // was cancelled (TaskCanceledException). All get collapsed into one exception type so the
+            // controller doesn't need to know which of these specifically happened.
             _logger.LogWarning(ex, "Partner verification call failed for partner {PartnerId} after resilience retries", partnerId);
             throw new PartnerVerificationUnavailableException(partnerId, ex);
         }
 
         if (!response.IsSuccessStatusCode)
         {
+            // A non-2xx response (e.g. the simulator's unhandled TimeoutException surfacing as 500)
+            // doesn't throw on its own — GetAsync only throws for transport-level failures — so this
+            // check is what actually catches "the call succeeded but the API said no/failed".
             _logger.LogWarning(
                 "Partner verification API returned {StatusCode} for partner {PartnerId} after resilience retries",
                 (int)response.StatusCode,
@@ -62,6 +73,9 @@ public class PartnerVerificationClient : IPartnerVerificationClient
 
     private Uri ResolveBaseUri()
     {
+        // The "external" Partner Verification API is actually PartnerVerificationSimulatorController
+        // in this same project (see its class summary for why) — there's no separate base URL to
+        // configure, so this reconstructs the current request's own scheme+host instead.
         var httpContext = _httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("No active HTTP context to resolve the partner verification API base URL.");
 

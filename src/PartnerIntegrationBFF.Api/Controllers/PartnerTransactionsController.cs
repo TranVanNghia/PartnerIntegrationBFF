@@ -39,6 +39,9 @@ public class PartnerTransactionsController : ControllerBase
         var validationResult = await _validator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
+            // Re-shape FluentValidation's errors into ModelState so ValidationProblem() below
+            // returns the framework's standard ValidationProblemDetails (RFC 9110) format, instead
+            // of a bespoke error shape that API consumers would need special-case handling for.
             foreach (var error in validationResult.Errors)
             {
                 ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
@@ -48,6 +51,7 @@ public class PartnerTransactionsController : ControllerBase
         }
 
         // Step 2: verify the partner against the (resilient) Partner Verification API.
+        // request.PartnerId! is safe here — validation above already guaranteed it's non-empty.
         bool isPartnerVerified;
         try
         {
@@ -55,6 +59,8 @@ public class PartnerTransactionsController : ControllerBase
         }
         catch (PartnerVerificationUnavailableException ex)
         {
+            // The client already retried internally (see PartnerVerificationClient); reaching here
+            // means every retry failed, so this is a genuine "come back later", not a bug.
             _logger.LogError(ex, "Partner verification unavailable for partner {PartnerId}", request.PartnerId);
             return Problem(
                 title: "Partner verification service is temporarily unavailable. Please retry later.",
@@ -63,6 +69,8 @@ public class PartnerTransactionsController : ControllerBase
 
         if (!isPartnerVerified)
         {
+            // Distinct from the 503 above: the verification API responded successfully, it just said
+            // "no" — a client-side problem (wrong/unknown partnerId), not a service outage.
             return Problem(
                 title: "Partner could not be verified.",
                 statusCode: StatusCodes.Status422UnprocessableEntity);
@@ -83,6 +91,8 @@ public class PartnerTransactionsController : ControllerBase
         }
         catch (TransactionQueueUnavailableException ex)
         {
+            // Validation and verification already succeeded at this point — only the broker call
+            // failed, so this 503 is scoped specifically to "try posting this transaction again".
             _logger.LogError(ex, "Failed to queue transaction {TransactionReference}", request.TransactionReference);
             return Problem(
                 title: "The message queue is temporarily unavailable. Please retry later.",
@@ -94,6 +104,8 @@ public class PartnerTransactionsController : ControllerBase
             request.TransactionReference,
             request.PartnerId);
 
+        // ReceivedAtUtc here is intentionally a fresh timestamp, not queueMessage.QueuedAtUtc — it
+        // marks when the API finished accepting the request, not when the message hit the queue.
         return Accepted(new PartnerTransactionAcceptedResponse
         {
             PartnerId = request.PartnerId!,
