@@ -71,6 +71,18 @@ API and the queue, and do they actually reach each other?" — that specific com
 build succeeding in a real Docker daemon, two containers reaching a healthy state, and them
 resolving each other over the Compose network) can't be simulated without Docker itself.
 
+**Proof it actually ran, green, on real Docker:**
+
+![GitHub Actions run succeeded — smoke-test job green, 1m 2s total](images/task-bonus/13-github-actions-workflow-success.png)
+
+![Job step log: "Run the Postman Docker Compose smoke test folder via Newman" step succeeded in 15s](images/task-bonus/14-github-actions-newman-postman-step-logs.png)
+
+The second screenshot is the step-by-step job log: `Build and start the stack` (the actual
+`docker compose up -d --build`), `Wait for RabbitMQ to report healthy`, `Wait for the API to accept
+connections`, then the Newman run against the Postman folder — each step green, each with its own
+timing. The one warning annotation (Node.js 20 deprecation on `actions/checkout@v4`) is a
+GitHub-runner notice unrelated to this project and requires no action.
+
 #### Why a separate Postman folder instead of reusing requests 1-14
 
 Requests 1-14 target `{{baseUrl}}` (`https://localhost:7051` by default — the `dotnet run` dev
