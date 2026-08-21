@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy this file to appsettings.Local.json (gitignored) and fill in real values. Used to point RabbitMq at a hosted broker (e.g. CloudAMQP) when Docker/local RabbitMQ isn't available. See docs/architecture/step-3-async-messaging.md.",
+  "RabbitMq": {
+    "HostName": "your-instance.lmq.cloudamqp.com",
+    "Port": 5671,
+    "UserName": "your-username",
+    "Password": "your-password",
+    "VirtualHost": "your-vhost",
+    "UseTls": true
+  }
+}

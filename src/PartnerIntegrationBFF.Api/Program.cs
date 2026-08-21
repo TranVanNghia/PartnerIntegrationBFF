@@ -8,6 +8,10 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Local-only overrides (e.g. a hosted broker for testing without Docker) — gitignored, takes
+// precedence over appsettings.json/appsettings.{Environment}.json. See appsettings.Local.json.example.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // Logging: Serilog to console + a daily rolling file under logs/ (see Serilog:* in appsettings.json).
 builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
     .ReadFrom.Configuration(context.Configuration)

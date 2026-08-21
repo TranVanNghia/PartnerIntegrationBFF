@@ -59,23 +59,21 @@ speaks the same AMQP 0-9-1 protocol as RabbitMQ, so `RabbitMQ.Client` connects t
 would to a local broker — just over TLS on port `5671` instead of plaintext `5672`. That's what
 `RabbitMqOptions.UseTls` and `RabbitMqOptions.VirtualHost` are for (see Design choices below).
 
-Configure it locally via [.NET User Secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets)
-— never commit real broker credentials into `appsettings.json`:
+Configure it locally via `appsettings.Local.json` — copy the checked-in template and fill in real
+values, never edit `appsettings.json` itself with real credentials:
 
 ```bash
 cd src/PartnerIntegrationBFF.Api
-dotnet user-secrets init
-dotnet user-secrets set "RabbitMq:HostName" "<your-instance>.lmq.cloudamqp.com"
-dotnet user-secrets set "RabbitMq:Port" "5671"
-dotnet user-secrets set "RabbitMq:UserName" "<user>"
-dotnet user-secrets set "RabbitMq:Password" "<password>"
-dotnet user-secrets set "RabbitMq:VirtualHost" "<vhost>"   # CloudAMQP free tier: same as the username
-dotnet user-secrets set "RabbitMq:UseTls" "true"
+cp appsettings.Local.json.example appsettings.Local.json
+# then edit appsettings.Local.json with your CloudAMQP HostName/UserName/Password/VirtualHost
 ```
 
-User Secrets override `appsettings.json` only on your machine and are never checked into git.
-`appsettings.json` itself stays pointed at `localhost`/plaintext for `docker-compose.yml`, which
-is what a reviewer with a working Docker setup will actually run.
+`appsettings.Local.json` is listed in `.gitignore`, loaded by `Program.cs`
+(`builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, ...)`) with higher
+precedence than `appsettings.json`/`appsettings.{Environment}.json`, and lives right next to them
+in the project folder so it's easy to find and edit — but it never gets committed. `appsettings.json`
+itself stays pointed at `localhost`/plaintext for `docker-compose.yml`, which is what a reviewer
+with a working Docker setup will actually run.
 
 ## Running RabbitMQ locally
 
@@ -105,6 +103,10 @@ transaction. AMQP is exposed on the standard port `5672`, matching the defaults 
   `PartnerVerificationApiOptions` from Step 2. `VirtualHost` and `UseTls` (both optional, default
   `"/"` and `false`) let the same code target either a local plaintext broker or a TLS-only hosted
   one (e.g. CloudAMQP) without any code change — see the Docker fallback note above.
+- **`appsettings.Local.json`** (gitignored, template checked in as `appsettings.Local.json.example`)
+  is the escape hatch for machine-specific overrides like real broker credentials — kept in the
+  project folder for convenience (unlike `dotnet user-secrets`, which stores values outside the
+  repo entirely) while still never landing in git.
 - **Publish failures never crash the request.** Connection errors, broken channels, and other
   broker-level exceptions are caught and wrapped in a single `TransactionQueueUnavailableException`;
   the controller turns that into a `503 ProblemDetails`, mirroring how Step 2 handles partner

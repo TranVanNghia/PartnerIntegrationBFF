@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Serilog file sink output
 logs/
+
+# Local-only config overrides (real credentials) — never commit, see appsettings.Local.json.example
+appsettings.Local.json
