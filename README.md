@@ -70,6 +70,15 @@ A ready-to-import collection is provided at
       `docker compose up -d rabbitmq` is running, otherwise `503`
    7. **Partner always unreachable** (`P-ALWAYS-TIMEOUT`) → `503 Service Unavailable`, not a crash
       (fails at verification, before the queue is ever involved)
+   8. **Queue transaction** (`docker compose up -d rabbitmq` first) → `202 Accepted`; check the
+      message landed on the `partner-transactions` queue at http://localhost:15672 (`guest`/`guest`)
+   9. **Queue unavailable** (`docker compose stop rabbitmq`, or don't start it) → `503`, not a crash
+
+Each step's architecture doc has annotated screenshots of these requests running (Postman +
+Swagger UI side by side) — see
+[docs/architecture/step-1-transaction-endpoint.md](docs/architecture/step-1-transaction-endpoint.md#testing-with-postman),
+[step-2-partner-verification.md](docs/architecture/step-2-partner-verification.md#testing-with-postman),
+and [step-3-async-messaging.md](docs/architecture/step-3-async-messaging.md#testing-with-postman).
 
 Equivalent `curl` calls (replace the port with whatever `dotnet run` printed):
 

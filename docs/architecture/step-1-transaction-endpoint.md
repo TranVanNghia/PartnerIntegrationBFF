@@ -98,9 +98,28 @@ Requests 1-4 in
 [`postman/PartnerIntegrationBFF.postman_collection.json`](../../postman/PartnerIntegrationBFF.postman_collection.json):
 
 1. **Valid transaction** → expects `202 Accepted`
+
+   | Postman | Swagger UI |
+   |---|---|
+   | ![Valid transaction - Postman](images/task-1/1-Valid%20transaction%20-%20202%20Accepted-postman.png) | ![Valid transaction - Swagger UI](images/task-1/1-Valid%20transaction%20-%20202%20Accepted-webUI.png) |
+
 2. **Empty payload** → expects `400` with all five fields flagged as required
+
+   | Postman | Swagger UI |
+   |---|---|
+   | ![Empty payload - Postman](images/task-1/2-If%20the%20payload%20is%20empty%20or%20missing%20required%20fields%2C%20return%20HTTP%20400%20%28Bad%20Request%29%20-%20postman.png) | ![Empty payload - Swagger UI](images/task-1/2-If%20the%20payload%20is%20empty%20or%20missing%20required%20fields%2C%20return%20HTTP%20400%20%28Bad%20Request%29%20-%20webUI.png) |
+
 3. **Amount <= 0** → expects `400` with the amount rule violated
+
+   | Postman | Swagger UI |
+   |---|---|
+   | ![Amount <= 0 - Postman](images/task-1/3-If%20the%20amount%20is%20less%20than%20or%20equal%20to%20zero%2C%20return%20HTTP%20400%20%28Bad%20Request%29%20-%20postman.png) | ![Amount <= 0 - Swagger UI](images/task-1/3-If%20the%20amount%20is%20less%20than%20or%20equal%20to%20zero%2C%20return%20HTTP%20400%20%28Bad%20Request%29%20-%20webUI.png) |
+
 4. **Invalid currency code** → expects `400` with the currency rule violated
+
+   | Postman | Swagger UI |
+   |---|---|
+   | ![Invalid currency - Postman](images/task-1/4-If%20the%20currency%20code%20is%20invalid%2C%20return%20HTTP%20400%20%28Bad%20Request%29%20-%20postman.png) | ![Invalid currency - Swagger UI](images/task-1/4-If%20the%20currency%20code%20is%20invalid%2C%20return%20HTTP%20400%20%28Bad%20Request%29%20-%20webUI.png) |
 
 ```bash
 curl -X POST http://localhost:5109/api/v1/partner/transactions \

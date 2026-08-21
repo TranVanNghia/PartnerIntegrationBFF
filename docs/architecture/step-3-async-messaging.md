@@ -68,6 +68,8 @@ cp appsettings.Local.json.example appsettings.Local.json
 # then edit appsettings.Local.json with your CloudAMQP HostName/UserName/Password/VirtualHost
 ```
 
+![CloudAMQP instance details — Region, AMQP details (User & Vhost, Password, Ports, URL)](images/task-3/0-cloudamqp-config.png)
+
 `appsettings.Local.json` is listed in `.gitignore`, loaded by `Program.cs`
 (`builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, ...)`) with higher
 precedence than `appsettings.json`/`appsettings.{Environment}.json`, and lives right next to them
@@ -130,6 +132,19 @@ Requests 8-9 in
 9. **Queue unavailable** (`docker compose stop rabbitmq`, or just don't start it) → validation and
    partner verification still pass, but the publish step fails, so the API returns a clean `503`
    instead of a `500` or a crash.
+
+![Postman request sending a transaction to be queued](images/task-3/3-postman-send-message.png)
+
+The first publish after startup opens a fresh connection to the broker (TLS handshake included, for
+a hosted broker like CloudAMQP), so it can take noticeably longer than later requests — don't read
+a slow first call as a bug:
+
+![Debug/log output showing the request timing](images/task-3/1-testing-debug.png)
+
+Once queued, the message is visible in the broker's own management UI (LavinMQ Manager for
+CloudAMQP, RabbitMQ's management UI at :15672 for the local docker-compose setup):
+
+![Queue overview showing the published message count](images/task-3/4-manage-queues.png)
 
 Equivalent `curl` calls (replace the port with whatever `dotnet run` printed):
 

@@ -81,6 +81,10 @@ Requests 5-7 in
    simulator's transient `500`s from you almost every time)
 7. **Partner always unreachable** (`P-ALWAYS-TIMEOUT`) → `503 Service Unavailable`, not a crash
 
+| Timeout behaviour observed | Postman |
+|---|---|
+| ![Should timeout when random value is less than 0.3](images/task-2/0-Should%20timeout%20when%20random%20value%20is%20less%20than%200.3.png) | ![Should timeout when random value is less than 0.3 - Postman](images/task-2/1-Should%20timeout%20when%20random%20value%20is%20less%20than%200.3-postman.png) |
+
 ```bash
 # Deterministic 503 (resilience exhausted) path
 curl -X POST http://localhost:5109/api/v1/partner/transactions \

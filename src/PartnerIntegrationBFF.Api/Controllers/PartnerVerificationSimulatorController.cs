@@ -20,15 +20,29 @@ public class PartnerVerificationSimulatorController : ControllerBase
     [HttpGet("{partnerId}")]
     public IActionResult Verify(string partnerId)
     {
-        // Left unhandled on purpose: ASP.NET Core turns this into a 500, which is what
-        // PartnerVerificationClient's resilience pipeline (Program.cs) treats as retryable — that's
-        // what actually exercises the retry/circuit-breaker logic on the calling side.
-        if (string.Equals(partnerId, AlwaysTimeoutPartnerId, StringComparison.OrdinalIgnoreCase)
-            || Random.Shared.NextDouble() < TimeoutProbability)
+        // Intentionally leave the exception unhandled.
+        // ASP.NET Core converts it to HTTP 500, which is treated as retryable
+        // by PartnerVerificationClient's resilience pipeline in Program.cs.
+
+        // Force a timeout for the partner used to test retry/circuit-breaker behavior.
+        if (string.Equals(partnerId, AlwaysTimeoutPartnerId, StringComparison.OrdinalIgnoreCase))
         {
-            throw new TimeoutException($"Partner verification timed out for partner '{partnerId}'.");
+            throw new TimeoutException(
+                $"Forced timeout for partner '{partnerId}'.");
         }
 
-        return Ok(new PartnerVerificationResult(partnerId, IsVerified: true, VerifiedAtUtc: DateTimeOffset.UtcNow));
+        // Randomly simulate a timeout based on the configured probability.
+        double randomValue = Random.Shared.NextDouble();
+        if (randomValue < TimeoutProbability)
+        {
+            throw new TimeoutException(
+                $"Random timeout for partner '{partnerId}'.");
+        }
+
+        return Ok(
+            new PartnerVerificationResult(
+                partnerId,
+                IsVerified: true,
+                VerifiedAtUtc: DateTimeOffset.UtcNow));
     }
 }
